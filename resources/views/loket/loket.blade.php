@@ -104,7 +104,12 @@
                         <!-- Nomor Antrian Aktif -->
                         <div class="bg-blue-100 rounded-2xl p-8 mb-6 border-4 border-blue-300 shadow-inner text-center pulse-animation" id="current-queue">
                             <p class="text-sm font-semibold text-blue-800">Nomor Antrian</p>
-                            <div class="text-8xl font-black text-blue-900 mt-2" id="current-queue-number">-</div>
+                            <div class="text-8xl font-black text-blue-900 mt-2" id="current-queue-number">
+                                @php
+                                    $currentQueue = $queues->where('status', 'called')->first();
+                                @endphp
+                                {{ $currentQueue ? $currentQueue->queue_number : '-' }}
+                            </div>
                         </div>
                         
                         <!-- Tombol Aksi -->
@@ -151,18 +156,24 @@
                                     <tr>
                                         <th class="py-3 px-4 text-left rounded-tl-xl">No. Antrian</th>
                                         <th class="py-3 px-4 text-left">Status</th>
-                                        <th class="py-3 px-4 text-left">Waktu</th>
-                                        <th class="py-3 px-4 text-left">aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody id="queue-list">
-                                    <!-- Data antrian akan diisi melalui JavaScript -->
+                                    @forelse ($queues->where('status', 'waiting') as $queue)
+                                    <tr class="hover:bg-gray-50 border-b">
+                                        <td class="py-3 px-4">{{ $queue->queue_number }}</td>
+                                        <td class="py-3 px-4">
+                                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-lg text-xs font-medium">Menunggu</span>
+                                        </td>
+                                    </tr>
+                                    @empty
                                     <tr>
-                                        <td colspan="4" class="py-8 text-center text-gray-500">
+                                        <td colspan="2" class="py-8 text-center text-gray-500">
                                             <i class="fas fa-info-circle mr-2"></i>
                                             Belum ada data antrian
                                         </td>
                                     </tr>
+                                    @endforelse
                                 </tbody>
                             </table>
                         </div>
@@ -171,408 +182,219 @@
             </div>
         </div>
     </main>
-
-    <!-- Modal Konfirmasi -->
-    <div id="confirmationModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden transition-opacity duration-300">
-        <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl relative transform scale-95 transition-transform duration-300">
-            <!-- Tombol close -->
-            <button onclick="closeModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 p-2 rounded-full hover:bg-gray-100 transition-colors">
-                <i class="fas fa-times w-5 h-5"></i>
-            </button>
-            
-            <!-- Judul dan deskripsi modal -->
-            <h2 class="text-3xl font-extrabold mb-2 text-blue-800" id="modal-title">Konfirmasi</h2>
-            <p class="text-gray-600 mb-6" id="modal-message">Apakah Anda yakin ingin melakukan tindakan ini?</p>
-            
-            <!-- Tombol aksi -->
-            <div class="flex space-x-4">
-                <button onclick="closeModal()" class="flex-1 py-3 rounded-xl font-semibold border border-gray-300 hover:bg-gray-100 transition">Batal</button>
-                <button id="confirm-action" class="flex-1 bg-blue-800 text-white py-3 rounded-xl font-semibold hover:bg-blue-900 transition shadow-lg">Konfirmasi</button>
+    
+    <!-- Modal Layani Pengunjung -->
+    <div id="serveModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Data Pengunjung</h3>
+                <button onclick="closeServeModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
+            <form id="visitorForm">
+                <input type="hidden" id="queue_id" name="queue_id">
+                <div class="mb-4">
+                    <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Nama</label>
+                    <input type="text" id="name" name="name" class="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                </div>
+                <div class="mb-4">
+                    <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">No. HP</label>
+                    <input type="text" id="phone" name="phone" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                <div class="mb-4">
+                    <label for="complaint" class="block text-sm font-medium text-gray-700 mb-1">Keluhan</label>
+                    <textarea id="complaint" name="complaint" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea>
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" onclick="closeServeModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md mr-2">Batal</button>
+                    <button type="button" onclick="submitVisitorData()" class="px-4 py-2 bg-blue-600 text-white rounded-md">Simpan</button>
+                </div>
+            </form>
         </div>
     </div>
-
+    
     <!-- JavaScript untuk Antrian dan Modal -->
     <script>
-        // Data antrian
-        let queueData = [];
-        let currentQueueIndex = -1;
-        let totalServed = 0;
+        // Token CSRF untuk request
+        const csrfToken = "{{ csrf_token() }}";
         
-        // Inisialisasi halaman
-        document.addEventListener('DOMContentLoaded', function() {
-            // Ambil data antrian dari PHP
-            initializeQueueData();
-            
-            // Cek apakah ada nomor antrian dari URL (dari halaman home)
-            const urlParams = new URLSearchParams(window.location.search);
-            const queueNumber = urlParams.get('queue_number');
-            
-            if (queueNumber) {
-                // Highlight antrian yang baru diambil
-                setTimeout(() => {
-                    highlightQueue(queueNumber);
-                }, 1000);
-            }
-            
-            // Set interval untuk refresh halaman setiap 30 detik
-            setInterval(function() {
-                window.location.reload();
-            }, 30000);
-        });
-        
-        // Fungsi untuk inisialisasi data antrian dari PHP
-        function initializeQueueData() {
-            // Ambil data dari PHP yang sudah dikirim oleh controller
-            queueData = {!! json_encode($queues->map(function($queue) {
-                return [
-                    'id' => $queue->id,
-                    'number' => $queue->queue_number,
-                    'status' => $queue->status,
-                    'time' => \Carbon\Carbon::parse($queue->created_at)->format('H:i')
-                ];
-            })) !!};
-            
-            // Update UI
-            updateQueueTable();
-            
-            // Hitung total antrian yang sudah dilayani
-            totalServed = queueData.filter(q => q.status === 'served').length;
-            updateCounters();
-            
-            // Set current queue jika ada yang sedang dipanggil
-            const calledQueue = queueData.findIndex(q => q.status === 'called');
-            if (calledQueue >= 0) {
-                currentQueueIndex = calledQueue;
-                updateCounters();
-            }
-        }
-        
-        // Fungsi untuk memperbarui tabel antrian
-        function updateQueueTable() {
-            const tableBody = document.getElementById('queue-list');
-            
-            if (queueData.length === 0) {
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="py-8 text-center text-gray-500">
-                            <i class="fas fa-info-circle mr-2"></i>
-                            Belum ada data antrian
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            let html = '';
-            
-            queueData.forEach((queue, index) => {
-                // Status badge
-                let statusBadge = '';
-                let actionButton = '';
-                
-                switch(queue.status) {
-                    case 'waiting':
-                        statusBadge = '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-lg text-xs font-medium">Menunggu</span>';
-                        actionButton = `<button onclick="callSpecificQueue(${index})" class="px-3 py-1 bg-blue-800 text-white rounded-lg text-xs font-medium hover:bg-blue-900 transition-colors">Panggil</button>`;
-                        break;
-                    case 'called':
-                        statusBadge = '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-lg text-xs font-medium">Dipanggil</span>';
-                        actionButton = `<div class="flex space-x-1">
-                            <button onclick="recallSpecificQueue(${index})" class="px-2 py-1 bg-yellow-500 text-white rounded-lg text-xs font-medium hover:bg-yellow-600 transition-colors">Ulang</button>
-                            <button onclick="markSpecificAbsent(${index})" class="px-2 py-1 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors">Absen</button>
-                            <button onclick="serveSpecificQueue(${index})" class="px-2 py-1 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors">Layani</button>
-                        </div>`;
-                        break;
-                    case 'absent':
-                        statusBadge = '<span class="px-2 py-1 bg-red-100 text-red-800 rounded-lg text-xs font-medium">Tidak Hadir</span>';
-                        actionButton = `<button onclick="callSpecificQueue(${index})" class="px-3 py-1 bg-blue-800 text-white rounded-lg text-xs font-medium hover:bg-blue-900 transition-colors">Panggil Ulang</button>`;
-                        break;
-                    case 'served':
-                        statusBadge = '<span class="px-2 py-1 bg-green-100 text-green-800 rounded-lg text-xs font-medium">Dilayani</span>';
-                        actionButton = '-';
-                        break;
-                }
-                
-                // Highlight baris yang sedang aktif
-                const rowClass = index === currentQueueIndex ? 'bg-blue-50' : (index % 2 === 0 ? 'bg-gray-50' : 'bg-white');
-                
-                html += `
-                    <tr class="${rowClass} hover:bg-blue-50 transition-colors">
-                        <td class="py-3 px-4 border-b border-gray-100 font-medium">${queue.number}</td>
-                        <td class="py-3 px-4 border-b border-gray-100">${statusBadge}</td>
-                        <td class="py-3 px-4 border-b border-gray-100">${queue.time}</td>
-                        <td class="py-3 px-4 border-b border-gray-100">${actionButton}</td>
-                    </tr>
-                `;
-            });
-            
-            tableBody.innerHTML = html;
-        }
-        
-        // Fungsi untuk memperbarui counter
-        function updateCounters() {
-            document.getElementById('total-queue').textContent = queueData.length;
-            document.getElementById('completed-queue').textContent = totalServed;
-            
-            // Update nomor antrian saat ini
-            if (currentQueueIndex >= 0) {
-                document.getElementById('current-queue-number').textContent = queueData[currentQueueIndex].number;
-            } else {
-                document.getElementById('current-queue-number').textContent = '-';
-            }
-        }
+        // ID Loket saat ini
+        const counterId = "{{ $counter->id }}";
         
         // Fungsi untuk memanggil antrian berikutnya
         function callQueue() {
-            // Cari antrian berikutnya yang statusnya 'waiting'
-            const nextIndex = queueData.findIndex(q => q.status === 'waiting');
-            
-            if (nextIndex >= 0) {
-                currentQueueIndex = nextIndex;
-                const queueId = queueData[nextIndex].id;
-                
-                // Update status di API
-                updateQueueStatus(queueId, 'called');
-                
-                // Animasi panggilan
-                const currentQueueElement = document.getElementById('current-queue');
-                currentQueueElement.classList.add('animate-border-pulse');
-                setTimeout(() => {
-                    currentQueueElement.classList.remove('animate-border-pulse');
-                }, 2000);
-                
-                // Tampilkan notifikasi
-                showNotification(`Memanggil nomor antrian ${queueData[nextIndex].number}`);
-            } else {
-                showNotification('Tidak ada antrian yang menunggu', 'warning');
-            }
+            // Kirim request ke server
+            fetch("{{ route('queue.callNext') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({
+                    counter_id: counterId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update tampilan antrian saat ini
+                    document.getElementById('current-queue-number').textContent = data.queue.queue_number;
+                    
+                    // Tambahkan kelas animasi
+                    const currentQueueElement = document.getElementById('current-queue');
+                    currentQueueElement.classList.add('animate-border-pulse');
+                    
+                    // Refresh halaman untuk memperbarui daftar antrian
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan saat memanggil antrian');
+            });
         }
         
         // Fungsi untuk memanggil ulang antrian saat ini
         function recallQueue() {
-            if (currentQueueIndex >= 0 && queueData[currentQueueIndex].status === 'called') {
-                // Animasi panggilan
-                const currentQueueElement = document.getElementById('current-queue');
-                currentQueueElement.classList.add('animate-border-pulse');
-                setTimeout(() => {
-                    currentQueueElement.classList.remove('animate-border-pulse');
-                }, 2000);
-                
-                // Animasi nomor antrian
-                animateQueueNumber(queueData[currentQueueIndex].number);
-                
-                // Tampilkan notifikasi
-                showNotification(`Memanggil ulang nomor antrian ${queueData[currentQueueIndex].number}`);
-            } else {
-                showNotification('Tidak ada antrian aktif untuk dipanggil ulang', 'warning');
+            const currentQueueNumber = document.getElementById('current-queue-number').textContent;
+            if (currentQueueNumber === '-') {
+                alert('Tidak ada antrian yang sedang dipanggil');
+                return;
             }
+            
+            // Tambahkan animasi saat memanggil ulang
+            const currentQueueElement = document.getElementById('current-queue');
+            currentQueueElement.classList.add('animate-border-pulse');
+            
+            // Hapus animasi setelah beberapa detik
+            setTimeout(() => {
+                currentQueueElement.classList.remove('animate-border-pulse');
+            }, 3000);
         }
         
-        // Fungsi untuk menandai antrian saat ini sebagai tidak hadir
+        // Fungsi untuk menandai antrian tidak hadir
         function markAbsent() {
-            if (currentQueueIndex >= 0 && queueData[currentQueueIndex].status === 'called') {
-                const queueId = queueData[currentQueueIndex].id;
-                const queueNumber = queueData[currentQueueIndex].number;
-                
-                // Update status di API
-                updateQueueStatus(queueId, 'absent');
-                
-                // Reset antrian saat ini
-                currentQueueIndex = -1;
-                
-                // Tampilkan notifikasi
-                showNotification(`Antrian ${queueNumber} ditandai tidak hadir`);
-            } else {
-                showNotification('Tidak ada antrian aktif untuk ditandai tidak hadir', 'warning');
+            const currentQueueNumber = document.getElementById('current-queue-number').textContent;
+            if (currentQueueNumber === '-') {
+                alert('Tidak ada antrian yang sedang dipanggil');
+                return;
             }
-        }
-        
-        // Fungsi untuk melayani antrian saat ini
-        function serveQueue() {
-            if (currentQueueIndex >= 0 && queueData[currentQueueIndex].status === 'called') {
-                const queueId = queueData[currentQueueIndex].id;
-                const queueNumber = queueData[currentQueueIndex].number;
-                
-                // Update status di API
-                updateQueueStatus(queueId, 'served');
-                
-                // Increment counter antrian yang dilayani
-                totalServed++;
-                
-                // Reset current queue
-                currentQueueIndex = -1;
-                
-                // Tampilkan notifikasi
-                showNotification(`Antrian ${queueNumber} telah dilayani`);
-            } else {
-                showNotification('Tidak ada antrian aktif untuk dilayani', 'warning');
-            }
-        }
-        
-        // Fungsi untuk mengupdate status antrian ke database
-        function updateQueueStatus(queueId, status) {
-            fetch(`/api/queue/${queueId}/status`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({ status: status })
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Refresh data antrian
-                fetchQueueData();
-            })
-            .catch(error => {
-                console.error('Error updating queue status:', error);
-                showNotification('Gagal mengupdate status antrian', 'error');
-            });
-        }
-        
-        // Fungsi untuk menampilkan notifikasi
-        function showNotification(message, type = 'info') {
-            // Implementasi sederhana dengan alert
-            alert(message);
             
-            // Dalam implementasi nyata, gunakan library notifikasi yang lebih baik
-            // seperti toastr, sweetalert2, dll.
-        }
-        
-        // Fungsi untuk highlight antrian tertentu
-        function highlightQueue(queueNumber) {
-            const index = queueData.findIndex(q => q.number === queueNumber);
-            if (index >= 0) {
-                // Scroll ke antrian yang dimaksud
-                const tableRows = document.querySelectorAll('#queue-list tr');
-                if (tableRows[index]) {
-                    tableRows[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    tableRows[index].classList.add('bg-yellow-100');
-                    setTimeout(() => {
-                        tableRows[index].classList.remove('bg-yellow-100');
-                    }, 3000);
-                }
+            // Konfirmasi tindakan
+            if (!confirm('Apakah Anda yakin ingin menandai antrian ini sebagai tidak hadir?')) {
+                return;
             }
-        }
-        
-        // Fungsi untuk animasi nomor antrian
-        function animateQueueNumber(number) {
-            const numberElement = document.getElementById('current-queue-number');
-            numberElement.textContent = number;
-            numberElement.classList.add('animate-number');
-            setTimeout(() => {
-                numberElement.classList.remove('animate-number');
-            }, 2000);
-        }
-        
-        // Fungsi untuk memanggil antrian tertentu
-        function callSpecificQueue(index) {
-            if (index >= 0 && index < queueData.length) {
-                // Jika ada antrian aktif sebelumnya, reset statusnya ke waiting
-                if (currentQueueIndex >= 0 && queueData[currentQueueIndex].status === 'called') {
-                    queueData[currentQueueIndex].status = 'waiting';
-                }
-                
-                currentQueueIndex = index;
-                queueData[index].status = 'called';
-                queueData[index].time = new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
-                
-                // Update UI
-                updateQueueTable();
-                updateCounters();
-                
-                // Animasi panggilan
-                const currentQueueElement = document.getElementById('current-queue');
-                currentQueueElement.classList.add('pulse-animation');
-                setTimeout(() => {
-                    currentQueueElement.classList.remove('pulse-animation');
-                }, 2000);
-                
-                // Simulasi suara panggilan
-                alert(`Memanggil nomor antrian ${queueData[index].number}`);
-            }
-        }
-        
-        // Fungsi untuk memanggil ulang antrian tertentu
-        function recallSpecificQueue(index) {
-            if (index >= 0 && index < queueData.length && queueData[index].status === 'called') {
-                queueData[index].time = new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
-                
-                // Update UI
-                updateQueueTable();
-                
-                // Animasi panggilan
-                const currentQueueElement = document.getElementById('current-queue');
-                currentQueueElement.classList.add('pulse-animation');
-                setTimeout(() => {
-                    currentQueueElement.classList.remove('pulse-animation');
-                }, 2000);
-                
-                // Simulasi suara panggilan ulang
-                alert(`Memanggil ulang nomor antrian ${queueData[index].number}`);
-            }
-        }
-        
-        // Fungsi untuk menandai antrian tertentu sebagai tidak hadir
-        function markSpecificAbsent(index) {
-            if (index >= 0 && index < queueData.length && queueData[index].status === 'called') {
-                queueData[index].status = 'absent';
-                queueData[index].time = new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
-                
-                // Jika ini adalah antrian aktif, reset
-                if (currentQueueIndex === index) {
-                    currentQueueIndex = -1;
-                }
-                
-                // Update UI
-                updateQueueTable();
-                updateCounters();
-            }
-        }
-        
-        // Fungsi untuk melayani antrian tertentu
-        function serveSpecificQueue(index) {
-            if (index >= 0 && index < queueData.length && queueData[index].status === 'called') {
-                queueData[index].status = 'served';
-                queueData[index].time = new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
-                
-                // Increment counter antrian yang dilayani
-                totalServed++;
-                
-                // Jika ini adalah antrian aktif, reset
-                if (currentQueueIndex === index) {
-                    currentQueueIndex = -1;
-                }
-                
-                // Update UI
-                updateQueueTable();
-                updateCounters();
-            }
-        }
-        
-        // Fungsi untuk modal konfirmasi
-        function openModal(title, message, confirmAction) {
-            document.getElementById('modal-title').textContent = title;
-            document.getElementById('modal-message').textContent = message;
-            document.getElementById('confirm-action').onclick = confirmAction;
             
-            const modal = document.getElementById('confirmationModal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.querySelector('.transform').classList.remove('scale-95');
-                modal.querySelector('.transform').classList.add('scale-100');
-            }, 10);
+            // Cari antrian yang sedang dipanggil (status = called)
+            @php
+            $calledQueue = $queues->where('status', 'called')->first();
+            @endphp
+            
+            @if($calledQueue)
+                // Kirim request ke server
+                fetch("{{ route('queue.markAbsent') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify({
+                        queue_id: "{{ $calledQueue->id }}"
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Reset tampilan antrian saat ini
+                        document.getElementById('current-queue-number').textContent = '-';
+                        
+                        // Refresh halaman untuk memperbarui daftar antrian
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Terjadi kesalahan saat menandai antrian tidak hadir');
+                });
+            @else
+                alert('Tidak ada antrian yang sedang dipanggil');
+            @endif
         }
         
-        function closeModal() {
-            const modal = document.getElementById('confirmationModal');
-            modal.querySelector('.transform').classList.remove('scale-100');
-            modal.querySelector('.transform').classList.add('scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
+        // Fungsi untuk melayani antrian
+    function serveQueue() {
+        // Cek apakah ada antrian yang sedang dipanggil
+        @php $calledQueue = $queues->where('status', 'called')->first(); @endphp
+        
+        @if($calledQueue)
+            // Tampilkan modal dan isi queue_id
+            document.getElementById('queue_id').value = {{ $calledQueue->id }};
+            document.getElementById('serveModal').classList.remove('hidden');
+        @else
+            alert('Tidak ada antrian yang sedang dipanggil');
+        @endif
+    }
+    
+    function closeServeModal() {
+        document.getElementById('serveModal').classList.add('hidden');
+        document.getElementById('visitorForm').reset();
+    }
+    
+    function submitVisitorData() {
+        const queueId = document.getElementById('queue_id').value;
+        const name = document.getElementById('name').value;
+        const phone = document.getElementById('phone').value;
+        const complaint = document.getElementById('complaint').value;
+        
+        if (!name) {
+            alert('Nama pengunjung harus diisi');
+            return;
         }
+        
+        fetch('{{ route("queue.serve") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({
+                queue_id: queueId,
+                name: name,
+                phone: phone,
+                complaint: complaint
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                closeServeModal();
+                
+                // Reset tampilan antrian yang dipanggil
+                document.getElementById('current-queue').textContent = '-';
+                
+                // Refresh halaman setelah 1 detik
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Terjadi kesalahan saat menyimpan data pengunjung');
+        });
+    }
     </script>
 </body>
 </html>

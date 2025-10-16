@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Queue;
 use App\Models\Counter;
+use App\Models\Visitor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -97,6 +98,123 @@ class QueueController extends Controller
         return view('loket.loket', [
             'counter' => $counter,
             'queues' => $queues
+        ]);
+    }
+    
+    // Fungsi untuk menandai antrian sebagai tidak hadir (absent)
+    public function markAbsent(Request $request)
+    {
+        $request->validate([
+            'queue_id' => 'required|exists:queues,id'
+        ]);
+        
+        try {
+            $queue = Queue::find($request->queue_id);
+            
+            // Pastikan antrian ini sedang dipanggil (status = called)
+            if ($queue->status !== 'called') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Hanya antrian yang sedang dipanggil yang dapat ditandai tidak hadir'
+                ], 400);
+            }
+            
+            // Update status menjadi absent
+            $queue->update([
+                'status' => 'absent',
+                'completed_at' => now()
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Antrian berhasil ditandai tidak hadir'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menandai antrian tidak hadir: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    // Fungsi untuk melayani antrian
+    public function serveQueue(Request $request)
+    {
+        $request->validate([
+            'queue_id' => 'required|exists:queues,id',
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'complaint' => 'nullable|string'
+        ]);
+        
+        try {
+            $queue = Queue::find($request->queue_id);
+            
+            // Pastikan antrian ini sedang dipanggil (status = called)
+            if ($queue->status !== 'called') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Hanya antrian yang sedang dipanggil yang dapat dilayani'
+                ], 400);
+            }
+            
+            // Simpan data pengunjung
+            $visitor = new Visitor();
+            $visitor->queue_id = $queue->id;
+            $visitor->name = $request->name;
+            $visitor->phone = $request->phone;
+            $visitor->complaint = $request->complaint;
+            $visitor->save();
+            
+            // Update status menjadi served
+            $queue->update([
+                'status' => 'served',
+                'completed_at' => now()
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengunjung berhasil dilayani'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal melayani pengunjung: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    // Fungsi untuk memanggil antrian berikutnya
+    public function callNext(Request $request)
+    {
+        $request->validate([
+            'counter_id' => 'required|exists:counters,id'
+        ]);
+        
+        $counterId = $request->counter_id;
+        
+        // Cari antrian berikutnya dengan status waiting
+        $nextQueue = Queue::where('counter_id', $counterId)
+                        ->where('status', 'waiting')
+                        ->whereDate('created_at', Carbon::today())
+                        ->orderBy('created_at', 'asc')
+                        ->first();
+        
+        if (!$nextQueue) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada antrian yang menunggu'
+            ]);
+        }
+        
+        // Update status antrian menjadi called
+        $nextQueue->status = 'called';
+        $nextQueue->called_at = Carbon::now();
+        $nextQueue->save();
+        
+        return response()->json([
+            'success' => true,
+            'queue' => $nextQueue
         ]);
     }
 }

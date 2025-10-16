@@ -23,12 +23,26 @@ Route::middleware(['guest'])->group(function () {
     Route::get('/queue/result/{queueId}', [QueueController::class, 'result'])->name('queue.result');
     // Route untuk mengambil data antrian berdasarkan loket
     Route::get('/queue/counter/{counterId}', [QueueController::class, 'getByCounter'])->name('queue.getByCounter');
+    // Route untuk memanggil antrian berikutnya
+Route::post('/queue/call-next', [QueueController::class, 'callNext'])->name('queue.callNext');
+// Route untuk memanggil ulang antrian
+Route::post('/queue/recall', [QueueController::class, 'recall'])->name('queue.recall');
+// Route untuk menandai antrian sebagai tidak hadir
+Route::post('/queue/mark-absent', [QueueController::class, 'markAbsent'])->name('queue.markAbsent');
+// Route untuk melayani antrian
+Route::post('/queue/serve', [QueueController::class, 'serveQueue'])->name('queue.serve');
 });
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function () { return view('admin.dashboard');})->name('dashboard');
     Route::get('/manajemenLoket', [CounterController::class, 'index'])->name('manajemenLoket');
-    Route::get('/laporan', function () { return view('admin.laporan');})->name('laporan');
+    
+    // Route untuk laporan dan CRUD visitors
+    Route::get('/laporan', [App\Http\Controllers\Admin\ReportController::class, 'index'])->name('admin.laporan.index');
+    Route::post('/laporan', [App\Http\Controllers\Admin\ReportController::class, 'store'])->name('admin.laporan.store');
+    Route::put('/laporan/{visitor}', [App\Http\Controllers\Admin\ReportController::class, 'update'])->name('admin.laporan.update');
+    Route::delete('/laporan/{visitor}', [App\Http\Controllers\Admin\ReportController::class, 'destroy'])->name('admin.laporan.destroy');
+    Route::get('/laporan-export', [App\Http\Controllers\Admin\ReportController::class, 'export'])->name('admin.laporan.export');
     
     // CRUD Loket
     Route::post('/loket', [CounterController::class, 'store'])->name('loket.store');
