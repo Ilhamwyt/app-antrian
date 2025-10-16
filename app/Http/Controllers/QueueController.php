@@ -78,4 +78,25 @@ class QueueController extends Controller
             'estimatedWaitTime' => $request->query('estimated_wait_time', 0)
         ]);
     }
+    
+    // Fungsi untuk mengambil data antrian berdasarkan loket
+    public function getByCounter($counterId)
+    {
+        // Validasi counter ID
+        $counter = Counter::find($counterId);
+        if (!$counter) {
+            return redirect('/')->with('error', 'Loket tidak ditemukan');
+        }
+        
+        // Ambil semua antrian untuk loket ini pada hari ini
+        $queues = Queue::where('counter_id', $counterId)
+                      ->whereDate('created_at', Carbon::today())
+                      ->orderBy('created_at', 'asc')
+                      ->get();
+        
+        return view('loket.loket', [
+            'counter' => $counter,
+            'queues' => $queues
+        ]);
+    }
 }

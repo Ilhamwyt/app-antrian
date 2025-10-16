@@ -152,6 +152,7 @@
                                         <th class="py-3 px-4 text-left rounded-tl-xl">No. Antrian</th>
                                         <th class="py-3 px-4 text-left">Status</th>
                                         <th class="py-3 px-4 text-left">Waktu</th>
+                                        <th class="py-3 px-4 text-left">aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody id="queue-list">
@@ -200,8 +201,8 @@
         
         // Inisialisasi halaman
         document.addEventListener('DOMContentLoaded', function() {
-            // Ambil data antrian dari API
-            fetchQueueData();
+            // Ambil data antrian dari PHP
+            initializeQueueData();
             
             // Cek apakah ada nomor antrian dari URL (dari halaman home)
             const urlParams = new URLSearchParams(window.location.search);
@@ -214,38 +215,37 @@
                 }, 1000);
             }
             
-            // Set interval untuk refresh data setiap 30 detik
-            setInterval(fetchQueueData, 30000);
+            // Set interval untuk refresh halaman setiap 30 detik
+            setInterval(function() {
+                window.location.reload();
+            }, 30000);
         });
         
-        // Fungsi untuk mengambil data antrian dari API
-        function fetchQueueData() {
-            const counterId = {{ $counter->id }};
+        // Fungsi untuk inisialisasi data antrian dari PHP
+        function initializeQueueData() {
+            // Ambil data dari PHP yang sudah dikirim oleh controller
+            queueData = {!! json_encode($queues->map(function($queue) {
+                return [
+                    'id' => $queue->id,
+                    'number' => $queue->queue_number,
+                    'status' => $queue->status,
+                    'time' => \Carbon\Carbon::parse($queue->created_at)->format('H:i')
+                ];
+            })) !!};
             
-            fetch(`/api/queue/counter/${counterId}`)
-                .then(response => response.json())
-                .then(data => {
-                    queueData = data.map(queue => ({
-                        id: queue.id,
-                        number: queue.queue_number,
-                        status: queue.status,
-                        time: new Date(queue.created_at).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})
-                    }));
-                    
-                    // Update UI
-                    updateQueueTable();
-                    updateCounters();
-                    
-                    // Set current queue jika ada yang sedang dipanggil
-                    const calledQueue = queueData.findIndex(q => q.status === 'called');
-                    if (calledQueue >= 0) {
-                        currentQueueIndex = calledQueue;
-                        updateCounters();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching queue data:', error);
-                });
+            // Update UI
+            updateQueueTable();
+            
+            // Hitung total antrian yang sudah dilayani
+            totalServed = queueData.filter(q => q.status === 'served').length;
+            updateCounters();
+            
+            // Set current queue jika ada yang sedang dipanggil
+            const calledQueue = queueData.findIndex(q => q.status === 'called');
+            if (calledQueue >= 0) {
+                currentQueueIndex = calledQueue;
+                updateCounters();
+            }
         }
         
         // Fungsi untuk memperbarui tabel antrian

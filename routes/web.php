@@ -21,6 +21,8 @@ Route::middleware(['guest'])->group(function () {
     Route::post('/queue/take', [QueueController::class, 'take'])->name('queue.take');
     // Route untuk menampilkan hasil antrian
     Route::get('/queue/result/{queueId}', [QueueController::class, 'result'])->name('queue.result');
+    // Route untuk mengambil data antrian berdasarkan loket
+    Route::get('/queue/counter/{counterId}', [QueueController::class, 'getByCounter'])->name('queue.getByCounter');
 });
 
 Route::middleware(['auth'])->group(function () {
