@@ -2,88 +2,80 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Queue;
+use App\Models\Counter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class QueueController extends Controller
 {
-    // Mengambil nomor antrian baru
+    // Fungsi untuk mengambil nomor antrian
     public function take(Request $request)
     {
         $request->validate([
-            'counter_id' => 'required|exists:counters,id',
-        ]);
-
-        $counterId = $request->counter_id;
-        
-        // Mendapatkan counter
-        $counter = \App\Models\Counter::findOrFail($counterId);
-        
-        // Mendapatkan nomor antrian terakhir untuk counter ini
-        $lastQueue = \App\Models\Queue::where('counter_id', $counterId)
-            ->whereDate('created_at', today())
-            ->latest()
-            ->first();
-        
-        // Menentukan nomor antrian baru
-        $queueNumber = 1;
-        if ($lastQueue) {
-            // Ekstrak nomor dari format (misal: A001)
-            $lastNumber = intval(substr($lastQueue->queue_number, 1));
-            $queueNumber = $lastNumber + 1;
-        }
-        
-        // Format nomor antrian (misal: A001)
-        $prefix = substr($counter->nama_loket, 0, 1);
-        $formattedNumber = $prefix . str_pad($queueNumber, 3, '0', STR_PAD_LEFT);
-        
-        // Membuat antrian baru
-        $queue = \App\Models\Queue::create([
-            'counter_id' => $counterId,
-            'queue_number' => $formattedNumber,
-            'status' => 'waiting',
+            'counter_id' => 'required|exists:counters,id'
         ]);
         
-        return response()->json([
-            'success' => true,
-            'queue' => $queue,
-            'counter' => $counter->nama_loket,
-        ]);
-    }
-    
-    // Mendapatkan daftar antrian untuk loket tertentu
-    public function getByCounter($counterId)
-    {
-        $queues = \App\Models\Queue::where('counter_id', $counterId)
-            ->whereDate('created_at', today())
-            ->orderBy('created_at', 'asc')
-            ->get();
+        $counter = Counter::find($request->counter_id);
+        
+        try {
+            // Generate nomor antrian (format 001, 002, dst)
+            $queueNumber = Queue::generateNumber($request->counter_id);
             
-        return response()->json($queues);
+            // Simpan ke database
+            $queue = Queue::create([
+                'counter_id' => $request->counter_id,
+                'queue_number' => $queueNumber,
+                'status' => 'waiting'
+            ]);
+            
+            // Hitung posisi antrian
+            $queuePosition = Queue::where('status', 'waiting')
+                ->whereDate('created_at', Carbon::today())
+                ->where('id', '<=', $queue->id)
+                ->count();
+            
+            // Estimasi waktu tunggu (asumsi 5 menit per antrian)
+            $estimatedWaitTime = ($queuePosition - 1) * 5;
+            
+            // Redirect ke halaman hasil dengan data antrian
+            return response()->json([
+                'success' => true,
+                'queue_id' => $queue->id,
+                'queue_number' => $queueNumber,
+                'counter_name' => $counter->nama_loket,
+                'queue_position' => $queuePosition,
+                'estimated_wait_time' => $estimatedWaitTime
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghasilkan nomor antrian: ' . $e->getMessage()
+            ], 500);
+        }
     }
     
-    // Memperbarui status antrian
-    public function updateStatus(Request $request, $id)
+    // Fungsi untuk menampilkan hasil antrian
+    public function result(Request $request)
     {
-        $request->validate([
-            'status' => 'required|in:waiting,called,absent,served',
-        ]);
+        $queueId = $request->query('queueId');
         
-        $queue = \App\Models\Queue::findOrFail($id);
-        
-        // Update status dan timestamp yang sesuai
-        $queue->status = $request->status;
-        
-        if ($request->status == 'called') {
-            $queue->called_at = now();
-        } elseif ($request->status == 'served') {
-            $queue->served_at = now();
+        if (!$queueId) {
+            return redirect('/')->with('error', 'Nomor antrian tidak ditemukan');
         }
         
-        $queue->save();
+        $queue = Queue::find($queueId);
         
-        return response()->json([
-            'success' => true,
-            'queue' => $queue
+        if (!$queue) {
+            return redirect('/')->with('error', 'Nomor antrian tidak ditemukan');
+        }
+        
+        return view('queues.result', [
+            'queueId' => $queue->id,
+            'queueNumber' => $queue->queue_number,
+            'counterName' => $queue->counter->nama_loket,
+            'queuePosition' => $request->query('queue_position', 1),
+            'estimatedWaitTime' => $request->query('estimated_wait_time', 0)
         ]);
     }
 }

@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('queue_number');
             $table->enum('status', ['waiting', 'called', 'absent', 'served'])->default('waiting');
             $table->timestamp('called_at')->nullable();
-            $table->timestamp('served_at')->nullable();
+            $table->timestamp('completed_at')->nullable();
             $table->timestamps();
         });
     }

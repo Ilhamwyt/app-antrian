@@ -115,7 +115,7 @@
                             </button>
                             <button onclick="recallQueue()" class="flex items-center justify-center px-4 py-3 bg-yellow-500 text-white rounded-xl font-semibold shadow-md hover:bg-yellow-600 transition-colors">
                                 <i class="fas fa-redo-alt mr-2"></i>
-                                Panggil Ulang
+                                Reply
                             </button>
                             <button onclick="markAbsent()" class="flex items-center justify-center px-4 py-3 bg-red-600 text-white rounded-xl font-semibold shadow-md hover:bg-red-700 transition-colors">
                                 <i class="fas fa-times mr-2"></i>
@@ -152,7 +152,6 @@
                                         <th class="py-3 px-4 text-left rounded-tl-xl">No. Antrian</th>
                                         <th class="py-3 px-4 text-left">Status</th>
                                         <th class="py-3 px-4 text-left">Waktu</th>
-                                        <th class="py-3 px-4 text-left rounded-tr-xl">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody id="queue-list">

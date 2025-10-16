@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Counter;
+use App\Models\Queue;
 use Illuminate\Http\Request;
 
 class CounterController extends Controller
@@ -93,19 +94,14 @@ class CounterController extends Controller
     public function show(string $id, Request $request)
     {
         $counter = Counter::findOrFail($id);
-        $queueNumber = $request->query('queue_number', null);
-        $queueData = [];
+        $queueNumber = $request->query('queue_number');
         
-        // Jika ada nomor antrian yang dikirim dari home.blade.php
-        if ($queueNumber) {
-            // Tambahkan antrian baru ke daftar
-            $queueData[] = [
-                'number' => $queueNumber,
-                'status' => 'waiting',
-                'time' => now()->format('H:i')
-            ];
-        }
+        //Ambil Daftar Antrian Untuk COunter Ini
+        $queues = Queue::where('counter_id', $id)
+            ->whereDate('created_at', now())
+            ->orderBy('id', 'asc')
+            ->get();
         
-        return view('loket.loket', compact('counter', 'queueData'));
+        return view('loket.loket', compact('counter', 'queues', 'queueNumber'));
     }
 }
