@@ -39,11 +39,14 @@ class VisitorsExport implements FromCollection, WithHeadings, WithMapping
     public function map($visitor): array
     {
         return [
-            $visitor->id,
-            $visitor->queue->queue_number,
+            $visitor->queue->queue_number ?? '-',
+            $visitor->nim,
             $visitor->name,
             $visitor->phone,
             $visitor->complaint,
+            $visitor->solution,
+            $visitor->status == 'selesai' ? 'Selesai' : 'Perlu Tindak Lanjut',
+            $visitor->forward_to ?? '-',
             $visitor->created_at->format('d/m/Y H:i:s'),
         ];
     }
@@ -51,11 +54,14 @@ class VisitorsExport implements FromCollection, WithHeadings, WithMapping
     public function headings(): array
     {
         return [
-            'ID',
-            'Nomor Antrian',
+            'No. Antrian',
+            'NIM',
             'Nama',
             'No. HP',
-            'Keluhan',
+            'Permasalahan',
+            'Solusi',
+            'Status',
+            'Tindak Lanjut',
             'Tanggal',
         ];
     }

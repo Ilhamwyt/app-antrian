@@ -92,7 +92,7 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $visitor->created_at->format('d/m/Y H:i') }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div class="flex space-x-2">
-                            <button type="button" onclick="openEditModal({{ $visitor->id }}, '{{ $visitor->nim }}', '{{ $visitor->name }}', '{{ $visitor->complaint }}', '{{ $visitor->solution }}', '{{ $visitor->status }}', '{{ $visitor->forward_to }}')" 
+                            <button type="button" onclick="openEditModal({{ $visitor->id }}, '{{ $visitor->nim }}', '{{ $visitor->name }}', '{{ $visitor->phone }}', '{{ $visitor->complaint }}', '{{ $visitor->solution }}', '{{ $visitor->status }}', '{{ $visitor->forward_to }}')" 
                                 class="text-indigo-600 hover:text-indigo-900">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -143,6 +143,11 @@
                 <div class="mb-4">
                     <label for="edit_name" class="block text-sm font-medium text-gray-700 mb-1">Nama</label>
                     <input type="text" id="edit_name" name="name" required 
+                        class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                </div>
+                <div class="mb-4">
+                    <label for="edit_phone" class="block text-sm font-medium text-gray-700 mb-1">No. Telepon</label>
+                    <input type="text" id="edit_phone" name="phone" required 
                         class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
                 </div>
                 <div class="mb-4">
@@ -223,10 +228,11 @@
     }
     
     // Modal Edit Data
-    function openEditModal(id, nim, name, complaint, solution, status, forward_to) {
+    function openEditModal(id, nim, name, phone, complaint, solution, status, forward_to) {
         document.getElementById('editForm').action = `/laporan/${id}`;
         document.getElementById('edit_nim').value = nim;
         document.getElementById('edit_name').value = name;
+        document.getElementById('edit_phone').value = phone;
         document.getElementById('edit_complaint').value = complaint;
         document.getElementById('edit_solution').value = solution;
         

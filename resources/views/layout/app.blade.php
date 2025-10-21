@@ -80,6 +80,12 @@
             <span>Manajemen Loket</span>
         </a>
         
+        <!-- Layanan -->
+        <a href="{{ route('layanan.index') }}" class="flex items-center px-4 py-3 text-sm font-medium rounded-xl {{ request()->routeIs('layanan.*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700' }} transition-colors duration-200">
+            <i class="fas fa-list-alt mr-3 text-lg"></i>
+            <span>Layanan</span>
+        </a>
+        
         <!-- Laporan -->
         <a href="{{ route('admin.laporan.index') }}" class="flex items-center px-4 py-3 text-sm font-medium rounded-xl {{ request()->routeIs('laporan') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700' }} transition-colors duration-200">
             <i class="fas fa-chart-bar mr-3 text-lg"></i>

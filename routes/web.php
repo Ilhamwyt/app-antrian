@@ -50,5 +50,8 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/loket/{id}', [CounterController::class, 'update'])->name('loket.update');
     Route::delete('/loket/{id}', [CounterController::class, 'destroy'])->name('loket.destroy');
     
+    // Rute untuk manajemen layanan
+    Route::resource('layanan', App\Http\Controllers\Admin\LayananController::class);
+    
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });

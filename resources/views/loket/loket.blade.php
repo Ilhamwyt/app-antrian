@@ -204,7 +204,7 @@
                 </div>
                 <div class="mb-4">
                     <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">No. Telepon</label>
-                    <input type="text" id="phone" name="phone" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    <input type="text" id="phone" name="phone" class="w-full px-3 py-2 border border-gray-300 rounded-md" required>
                 </div>
                 <div class="mb-4">
                     <label for="complaint" class="block text-sm font-medium text-gray-700 mb-1">Permasalahan</label>
@@ -391,6 +391,7 @@
         const queueId = document.getElementById('queue_id').value;
         const nim = document.getElementById('nim').value;
         const name = document.getElementById('name').value;
+        const phone = document.getElementById('phone').value;
         const complaint = document.getElementById('complaint').value;
         const solution = document.getElementById('solution').value;
         const status = document.querySelector('input[name="status"]:checked').value;
@@ -403,6 +404,11 @@
         
         if (!name) {
             alert('Nama pengunjung harus diisi');
+            return;
+        }
+        
+        if (!phone) {
+            alert('Nomor telepon harus diisi');
             return;
         }
         
@@ -421,6 +427,7 @@
                 queue_id: queueId,
                 nim: nim,
                 name: name,
+                phone: document.getElementById('phone').value,
                 complaint: complaint,
                 solution: solution,
                 status: status,

@@ -33,10 +33,12 @@ class CounterController extends Controller
     {
         $request->validate([
             'nama_loket' => 'required|string|max:255',
+            'layanan_id' => 'nullable|exists:layanan,id',
         ]);
 
         Counter::create([
             'nama_loket' => $request->nama_loket,
+            'layanan_id' => $request->layanan_id,
         ]);
 
         return redirect()->route('manajemenLoket')->with('success', 'Loket berhasil ditambahkan');
@@ -58,11 +60,13 @@ class CounterController extends Controller
     {
         $request->validate([
             'nama_loket' => 'required|string|max:255',
+            'layanan_id' => 'nullable|exists:layanan,id',
         ]);
 
         $counter = Counter::findOrFail($id);
         $counter->update([
             'nama_loket' => $request->nama_loket,
+            'layanan_id' => $request->layanan_id,
         ]);
 
         return redirect()->route('manajemenLoket')->with('success', 'Loket berhasil diperbarui');

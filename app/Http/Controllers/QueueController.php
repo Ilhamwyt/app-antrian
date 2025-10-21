@@ -142,9 +142,13 @@ class QueueController extends Controller
     {
         $request->validate([
             'queue_id' => 'required|exists:queues,id',
+            'nim' => 'required|string|max:50',
             'name' => 'required|string|max:255',
-            'phone' => 'nullable|string|max:20',
-            'complaint' => 'nullable|string'
+            'phone' => 'required|string|max:20',
+            'complaint' => 'nullable|string',
+            'solution' => 'nullable|string',
+            'status' => 'required|string',
+            'forward_to' => 'nullable|string'
         ]);
         
         try {
@@ -161,9 +165,13 @@ class QueueController extends Controller
             // Simpan data pengunjung
             $visitor = new Visitor();
             $visitor->queue_id = $queue->id;
+            $visitor->nim = $request->nim;
             $visitor->name = $request->name;
             $visitor->phone = $request->phone;
             $visitor->complaint = $request->complaint;
+            $visitor->solution = $request->solution;
+            $visitor->status = $request->status;
+            $visitor->forward_to = $request->forward_to;
             $visitor->save();
             
             // Update status menjadi served

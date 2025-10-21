@@ -11,9 +11,13 @@ class Visitor extends Model
     
     protected $fillable = [
         'queue_id',
+        'nim',
         'name',
         'phone',
-        'complaint'
+        'complaint',
+        'solution',
+        'status',
+        'forward_to'
     ];
     
     public function queue()

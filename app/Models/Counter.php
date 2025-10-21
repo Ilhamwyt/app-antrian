@@ -6,5 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class Counter extends Model
 {
-    protected $fillable = ['nama_loket'];
+    protected $fillable = ['nama_loket', 'layanan_id', 'keterangan'];
+    
+    public function layanan()
+    {
+        return $this->belongsTo(Layanan::class);
+    }
 }
