@@ -70,7 +70,7 @@
                     <!-- Logo UT - Menggunakan placeholder image -->
                     <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTfrdsbep7iJmgnurZys2VhxUURu1uocZ7YFQ&s" alt="Logo UT" class="w-12 h-12 rounded-full shadow-md object-cover" />
                     <div>
-                        <h1 class="text-2xl font-extrabold text-black-900">UNIVERSITAS TERBUKA</h1>
+                        <h1 class="text-2xl font-extrabold text-gray-900">UNIVERSITAS TERBUKA</h1>
                         <p class="text-sm text-gray-500 font-medium">Sistem Antrian Digital</p>
                     </div>
                 </div>
@@ -102,7 +102,7 @@
                         <h2 class="text-2xl font-bold text-gray-900 mb-6">Antrian Saat Ini</h2>
                         
                         <!-- Nomor Antrian Aktif -->
-                        <div class="bg-blue-100 rounded-2xl p-8 mb-6 border-4 border-blue-300 shadow-inner text-center pulse-animation" id="current-queue">
+                        <div class="bg-blue-100 rounded-2xl p-8 mb-6 border-4 border-blue-300 shadow-inner text-center animate-border-pulse" id="current-queue">
                             <p class="text-sm font-semibold text-blue-800">Nomor Antrian</p>
                             <div class="text-8xl font-black text-blue-900 mt-2" id="current-queue-number">
                                 @php
@@ -120,7 +120,7 @@
                             </button>
                             <button onclick="recallQueue()" class="flex items-center justify-center px-4 py-3 bg-yellow-500 text-white rounded-xl font-semibold shadow-md hover:bg-yellow-600 transition-colors">
                                 <i class="fas fa-redo-alt mr-2"></i>
-                                Reply
+                                Ulangi
                             </button>
                             <button onclick="markAbsent()" class="flex items-center justify-center px-4 py-3 bg-red-600 text-white rounded-xl font-semibold shadow-md hover:bg-red-700 transition-colors">
                                 <i class="fas fa-times mr-2"></i>
@@ -195,16 +195,43 @@
             <form id="visitorForm">
                 <input type="hidden" id="queue_id" name="queue_id">
                 <div class="mb-4">
+                    <label for="nim" class="block text-sm font-medium text-gray-700 mb-1">NIM</label>
+                    <input type="text" id="nim" name="nim" class="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                </div>
+                <div class="mb-4">
                     <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Nama</label>
                     <input type="text" id="name" name="name" class="w-full px-3 py-2 border border-gray-300 rounded-md" required>
                 </div>
                 <div class="mb-4">
-                    <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">No. HP</label>
+                    <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">No. Telepon</label>
                     <input type="text" id="phone" name="phone" class="w-full px-3 py-2 border border-gray-300 rounded-md">
                 </div>
                 <div class="mb-4">
-                    <label for="complaint" class="block text-sm font-medium text-gray-700 mb-1">Keluhan</label>
+                    <label for="complaint" class="block text-sm font-medium text-gray-700 mb-1">Permasalahan</label>
                     <textarea id="complaint" name="complaint" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label for="solution" class="block text-sm font-medium text-gray-700 mb-1">Solusi</label>
+                    <textarea id="solution" name="solution" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <div class="flex space-x-4">
+                        <div class="flex items-center">
+                            <input type="radio" id="status_selesai" name="status" value="selesai" checked 
+                                class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" onchange="toggleForwardTo(false)">
+                            <label for="status_selesai" class="ml-2 block text-sm text-gray-700">Selesai</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="radio" id="status_tindak_lanjut" name="status" value="perlu_tindak_lanjut" 
+                                class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" onchange="toggleForwardTo(true)">
+                            <label for="status_tindak_lanjut" class="ml-2 block text-sm text-gray-700">Perlu Tindak Lanjut</label>
+                        </div>
+                    </div>
+                </div>
+                <div id="forward_to_container" class="mb-4 hidden">
+                    <label for="forward_to" class="block text-sm font-medium text-gray-700 mb-1">Kepada Siapa</label>
+                    <input type="text" id="forward_to" name="forward_to" class="w-full px-3 py-2 border border-gray-300 rounded-md">
                 </div>
                 <div class="flex justify-end">
                     <button type="button" onclick="closeServeModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md mr-2">Batal</button>
@@ -349,14 +376,38 @@
         document.getElementById('visitorForm').reset();
     }
     
+    // Fungsi untuk menampilkan/menyembunyikan field "Kepada Siapa"
+    function toggleForwardTo(show) {
+        const forwardToContainer = document.getElementById('forward_to_container');
+        if (show) {
+            forwardToContainer.classList.remove('hidden');
+        } else {
+            forwardToContainer.classList.add('hidden');
+            document.getElementById('forward_to').value = '';
+        }
+    }
+    
     function submitVisitorData() {
         const queueId = document.getElementById('queue_id').value;
+        const nim = document.getElementById('nim').value;
         const name = document.getElementById('name').value;
-        const phone = document.getElementById('phone').value;
         const complaint = document.getElementById('complaint').value;
+        const solution = document.getElementById('solution').value;
+        const status = document.querySelector('input[name="status"]:checked').value;
+        const forwardTo = document.getElementById('forward_to').value;
+        
+        if (!nim) {
+            alert('NIM harus diisi');
+            return;
+        }
         
         if (!name) {
             alert('Nama pengunjung harus diisi');
+            return;
+        }
+        
+        if (status === 'perlu_tindak_lanjut' && !forwardTo) {
+            alert('Field "Kepada Siapa" harus diisi untuk tindak lanjut');
             return;
         }
         
@@ -368,9 +419,12 @@
             },
             body: JSON.stringify({
                 queue_id: queueId,
+                nim: nim,
                 name: name,
-                phone: phone,
-                complaint: complaint
+                complaint: complaint,
+                solution: solution,
+                status: status,
+                forward_to: forwardTo
             })
         })
         .then(response => response.json())

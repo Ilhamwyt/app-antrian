@@ -14,9 +14,13 @@ return new class extends Migration
         Schema::create('visitors', function (Blueprint $table) {
             $table->id();
             $table->foreignId('queue_id')->constrained()->onDelete('cascade');
+            $table->string('nim');
             $table->string('name');
-            $table->string('phone')->nullable();
+            $table->string('phone');
             $table->text('complaint')->nullable();
+            $table->text('solution')->nullable();
+            $table->enum('status', ['selesai', 'perlu_tindak_lanjut'])->default('selesai');
+            $table->string('forward_to')->nullable();
             $table->timestamps();
         });
     }
