@@ -39,12 +39,16 @@ class QueueController extends Controller
             // Estimasi waktu tunggu (asumsi 5 menit per antrian)
             $estimatedWaitTime = ($queuePosition - 1) * 5;
             
+            // Broadcast event untuk update realtime
+            event(new \App\Events\QueueUpdated($queue));
+            
             // Redirect ke halaman hasil dengan data antrian
             return response()->json([
                 'success' => true,
                 'queue_id' => $queue->id,
                 'queue_number' => $queueNumber,
                 'counter_name' => $counter->nama_loket,
+                'counter_id' => $counter->id,
                 'queue_position' => $queuePosition,
                 'estimated_wait_time' => $estimatedWaitTime
             ]);

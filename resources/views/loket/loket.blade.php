@@ -16,6 +16,9 @@
     
     <!-- Google Fonts (Poppins) untuk tipografi -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- ResponsiveVoice API untuk fitur suara -->
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=RJIwPqiW"></script>
 
     <!-- Konfigurasi dan Gaya Kustom -->
     <style>
@@ -80,13 +83,10 @@
                     <div class="text-right">
                         <h2 class="text-xl font-bold text-blue-800">{{ $counter->nama_loket }}</h2>
                     </div>
-                    <a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-xl shadow-lg hover:bg-red-700 transition-all duration-300">
+                    <a href="{{ url('/') }}" class="inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-xl shadow-lg hover:bg-red-700 transition-all duration-300">
                         <i class="fas fa-sign-out-alt w-4 h-4 mr-2"></i>
                         Logout
                     </a>
-                    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">
-                        @csrf
-                    </form>
                 </div>
             </div>
         </div>
@@ -242,12 +242,53 @@
     </div>
     
     <!-- JavaScript untuk Antrian dan Modal -->
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
     <script>
         // Token CSRF untuk request
         const csrfToken = "{{ csrf_token() }}";
         
         // ID Loket saat ini
         const counterId = "{{ $counter->id }}";
+        const counterName = "{{ $counter->nama_loket }}";
+        
+        // Inisialisasi Pusher
+        const pusher = new Pusher('{{ env('PUSHER_APP_KEY') }}', {
+            cluster: '{{ env('PUSHER_APP_CLUSTER') }}',
+            encrypted: true
+        });
+        
+        // Subscribe ke channel counter
+        const channel = pusher.subscribe('counter.' + counterId);
+        
+        // Listen untuk event queue.updated
+        channel.bind('queue.updated', function(data) {
+            console.log('Queue updated:', data);
+            // Refresh halaman untuk menampilkan data terbaru
+            window.location.reload();
+        });
+        
+        // Fungsi untuk memutar suara bell
+        function playBell() {
+            return new Promise((resolve) => {
+                const bell = new Audio('{{ asset('bell.mp3') }}');
+                bell.play();
+                bell.onended = function() {
+                    resolve();
+                };
+            });
+        }
+        
+        // Fungsi untuk mengucapkan nomor antrian
+        function speakQueueNumber(queueNumber) {
+            // Format nomor antrian untuk diucapkan (misalnya: 001 menjadi "nol nol satu")
+            const formattedNumber = queueNumber.padStart(3, '0');
+            
+            // Teks yang akan diucapkan
+            const text = `Nomor antrian, ${formattedNumber}, silahkan menuju ke, loket ${counterName.split(' ').pop()}`;
+            
+            // Menggunakan ResponsiveVoice untuk mengucapkan teks
+            responsiveVoice.speak(text, "Indonesian Female", {rate: 0.9});
+        }
         
         // Fungsi untuk memanggil antrian berikutnya
         function callQueue() {
@@ -272,10 +313,15 @@
                     const currentQueueElement = document.getElementById('current-queue');
                     currentQueueElement.classList.add('animate-border-pulse');
                     
+                    // Putar suara bell dan panggil nomor antrian
+                    playBell().then(() => {
+                        speakQueueNumber(data.queue.queue_number);
+                    });
+                    
                     // Refresh halaman untuk memperbarui daftar antrian
                     setTimeout(() => {
                         window.location.reload();
-                    }, 2000);
+                    }, 5000); // Perpanjang waktu refresh agar suara selesai diputar
                 } else {
                     alert(data.message);
                 }
@@ -298,10 +344,15 @@
             const currentQueueElement = document.getElementById('current-queue');
             currentQueueElement.classList.add('animate-border-pulse');
             
+            // Putar suara bell dan panggil nomor antrian
+            playBell().then(() => {
+                speakQueueNumber(currentQueueNumber);
+            });
+            
             // Hapus animasi setelah beberapa detik
             setTimeout(() => {
                 currentQueueElement.classList.remove('animate-border-pulse');
-            }, 3000);
+            }, 5000);
         }
         
         // Fungsi untuk menandai antrian tidak hadir
@@ -456,6 +507,39 @@
             alert('Terjadi kesalahan saat menyimpan data pengunjung');
         });
     }
+    </script>
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+    <script>
+        // Fungsi untuk memperbarui tampilan jam
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            document.getElementById('current-time').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+        
+        // Update jam setiap detik
+        updateClock();
+        setInterval(updateClock, 1000);
+        
+        // Inisialisasi Pusher untuk realtime updates
+        const pusher = new Pusher('{{ env("PUSHER_APP_KEY") }}', {
+            cluster: '{{ env("PUSHER_APP_CLUSTER") }}',
+            encrypted: true
+        });
+        
+        // Subscribe ke channel counter
+        const channel = pusher.subscribe('counter.{{ $counter->id }}');
+        
+        // Listen untuk event queue.updated
+        channel.bind('queue.updated', function(data) {
+            console.log('Queue updated:', data);
+            // Refresh halaman untuk menampilkan data terbaru
+            // Atau update elemen DOM secara langsung tanpa refresh
+            location.reload();
+        });
     </script>
 </body>
 </html>

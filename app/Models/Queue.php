@@ -33,19 +33,29 @@ class Queue extends Model
             throw new \Exception('Counter not found');
         }
         
-        // Ambil nomor antrian terakhir untuk hari ini (semua counter)
-        $lastQueue = self::whereDate('created_at', Carbon::today())
-            ->orderBy('queue_number', 'desc')
-            ->first();
+        // Cek apakah tanggal terakhir pengambilan antrian berbeda dengan hari ini
+        $lastQueueDate = self::orderBy('created_at', 'desc')->first()?->created_at;
+        $today = Carbon::today();
         
-        // Generate nomor antrian baru
-        if ($lastQueue) {
-            // Ekstrak angka dari nomor antrian terakhir (misal 001 -> 1)
-            $lastNumber = intval($lastQueue->queue_number);
-            $newNumber = $lastNumber + 1;
-        } else {
-            // Jika belum ada antrian hari ini, mulai dari 1
+        // Reset antrian jika tanggal berbeda
+        if (!$lastQueueDate || $lastQueueDate->startOfDay()->lt($today)) {
+            // Jika tanggal berbeda, mulai dari 1
             $newNumber = 1;
+        } else {
+            // Ambil nomor antrian terakhir untuk hari ini (semua counter)
+            $lastQueue = self::whereDate('created_at', $today)
+                ->orderBy('queue_number', 'desc')
+                ->first();
+            
+            // Generate nomor antrian baru
+            if ($lastQueue) {
+                // Ekstrak angka dari nomor antrian terakhir (misal 001 -> 1)
+                $lastNumber = intval($lastQueue->queue_number);
+                $newNumber = $lastNumber + 1;
+            } else {
+                // Jika belum ada antrian hari ini, mulai dari 1
+                $newNumber = 1;
+            }
         }
         
         // Format nomor antrian (001, 002, dst)

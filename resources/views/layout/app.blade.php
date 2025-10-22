@@ -119,6 +119,12 @@
                         <!-- page_title (Dashboard) -->
                         <h1 class="ml-4 text-2xl font-bold text-gray-800">@yield('page_title', 'Dashboard')</h1>
                     </div>
+                    <div class="flex items-center">
+                        <div id="realtime-clock" class="text-lg font-semibold text-gray-700">
+                            <i class="far fa-clock mr-2"></i>
+                            <span id="current-time">00:00:00</span>
+                        </div>
+                    </div>
                 </div>
             </header>
             
@@ -134,6 +140,20 @@
             document.getElementById('sidebar').classList.toggle('open');
             document.getElementById('sidebar').classList.toggle('hidden');
         });
+        
+        // Fungsi untuk menampilkan jam realtime
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            document.getElementById('current-time').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+        
+        // Update jam setiap detik
+        updateClock();
+        setInterval(updateClock, 1000);
     </script>
 </body>
 </html>

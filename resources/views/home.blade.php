@@ -104,7 +104,7 @@
                     </div>
                     <h3 class="text-2xl font-bold text-gray-900 mb-3">Monitor Antrian</h3>
                     <p class="text-gray-600 mb-8 font-light">Pantau status, nomor antrian, dan loket yang aktif secara real-time.</p>
-                    <button onclick="" class="inline-flex items-center justify-center px-6 py-3 w-full text-sm font-semibold text-white bg-blue-800 rounded-xl shadow-lg hover:bg-blue-900 transition-all duration-300">Lihat Monitor</button>
+                    <a href="{{ url('/monitor') }}" class="inline-flex items-center justify-center px-6 py-3 w-full text-sm font-semibold text-white bg-blue-800 rounded-xl shadow-lg hover:bg-blue-900 transition-all duration-300">Lihat Monitor</a>
                 </div>
             </div>
         </div>
