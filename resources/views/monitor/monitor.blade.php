@@ -8,8 +8,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
     
+    <!-- jQuery untuk AJAX -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
     <!-- ResponsiveVoice API Key provided by user -->
-    <script src="https://code.responsivevoice.org/responsivevoice.js?key=RJIwPqiI"></script>
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=RJIwPqiW"></script>
 
     <style>
         body {
@@ -110,6 +113,8 @@
     </style>
 </head>
 <body class="antialiased bg-gradient-to-br from-blue-900 to-blue-600 text-white min-h-screen overflow-auto lg:overflow-hidden">
+    <!-- Elemen audio untuk suara bell -->
+    <audio id="bell-sound" src="{{ asset('bell.mp3') }}" preload="auto" style="display: none;"></audio>
     
     <!-- HEADER (Hanya Judul) - Margin Bawah Dihapus -->
     <header class="glass-container rounded-b-3xl flex justify-center items-center px-8 py-3">
@@ -225,11 +230,39 @@
          // Fungsi untuk memutar suara bell
          function playBell() {
              return new Promise((resolve) => {
-                 const bell = new Audio('{{ asset('bell.mp3') }}');
-                 bell.play();
-                 bell.onended = function() {
+                 // Gunakan elemen audio yang sudah ada di HTML
+                 const bell = document.getElementById('bell-sound');
+                 if (!bell) {
+                     console.error('Bell sound element not found!');
+                     resolve();
+                     return;
+                 }
+                 
+                 // Reset posisi audio ke awal
+                 bell.currentTime = 0;
+                 
+                 // Atur volume ke maksimum
+                 bell.volume = 1.0;
+                 
+                 // Tambahkan event listener untuk mendeteksi ketika suara selesai diputar
+                 const onEndedHandler = function() {
+                     bell.removeEventListener('ended', onEndedHandler);
+                     console.log('Bell sound finished playing');
                      resolve();
                  };
+                 
+                 bell.addEventListener('ended', onEndedHandler);
+                 
+                 // Putar suara bell
+                 const playPromise = bell.play();
+                 
+                 // Handle kasus ketika browser tidak mengizinkan autoplay
+                 if (playPromise !== undefined) {
+                     playPromise.catch(err => {
+                         console.error('Failed to play bell sound:', err);
+                         resolve();
+                     });
+                 }
              });
          }
 
@@ -237,19 +270,70 @@
           * Mengucapkan nomor antrian menggunakan ResponsiveVoice.
           */
          function speakQueueNumber(queueNumber, counterName) {
-             const formattedNumber = String(queueNumber).padStart(3, '0');
-             const digits = formattedNumber.split('').join(', '); 
-             const text = `Nomor antrian, ${digits}, silahkan menuju ke, ${counterName}`;
-             
-             if (typeof responsiveVoice !== 'undefined' && responsiveVoice.isPlaying() === false) {
-                 responsiveVoice.speak(text, "Indonesian Female", { rate: 0.9, volume: 1 });
-             } else {
-                 console.warn('ResponsiveVoice not ready or already speaking. Skipping speech for Q' + queueNumber);
+             // Pastikan responsiveVoice tersedia
+             if (typeof responsiveVoice === 'undefined') {
+                 console.error('ResponsiveVoice not available. Loading it now...');
+                 
+                 // Coba muat ulang script ResponsiveVoice
+                 const script = document.createElement('script');
+                 script.src = 'https://code.responsivevoice.org/responsivevoice.js?key=RJIwPqiW';
+                 script.onload = function() {
+                     console.log('ResponsiveVoice loaded successfully, trying to speak now');
+                     speakQueueWithVoice(queueNumber, counterName);
+                 };
+                 script.onerror = function() {
+                     console.error('Failed to load ResponsiveVoice');
+                 };
+                 document.head.appendChild(script);
+                 return;
              }
+             
+             speakQueueWithVoice(queueNumber, counterName);
+         }
+         
+         /**
+          * Helper function untuk mengucapkan nomor antrian
+          */
+         function speakQueueWithVoice(queueNumber, counterName) {
+             const formattedNumber = String(queueNumber).padStart(3, '0');
+             const digits = formattedNumber.split('').join(' '); 
+             const counterNameShort = counterName.split(' ').pop(); // Ambil hanya bagian terakhir dari nama loket
+             const text = `Nomor antrian, ${digits}, silahkan menuju ke, loket ${counterNameShort}`;
+             
+             console.log('Attempting to speak:', text);
+             
+             // Hentikan suara yang sedang berjalan
+             if (responsiveVoice.isPlaying()) {
+                 responsiveVoice.cancel();
+             }
+             
+             // Coba inisialisasi ulang jika belum siap
+             if (!responsiveVoice.voiceSupport()) {
+                 console.log('Voice support not ready, initializing...');
+                 responsiveVoice.init();
+             }
+             
+             // Gunakan timeout untuk memastikan ada jeda sebelum berbicara
+             setTimeout(() => {
+                 console.log('Speaking now with ResponsiveVoice');
+                 try {
+                     responsiveVoice.speak(text, "Indonesian Female", { 
+                         rate: 0.9, 
+                         volume: 1,
+                         pitch: 1,
+                         onstart: function() { console.log('ResponsiveVoice started speaking'); },
+                         onend: function() { console.log('ResponsiveVoice finished speaking'); },
+                         onerror: function(e) { console.error('ResponsiveVoice error:', e); }
+                     });
+                 } catch (error) {
+                     console.error('Error when trying to speak:', error);
+                 }
+             }, 500);
          }
 
          /**
-          * Mengupdate tampilan di monitor dan memicu suara/animasi.
+          * Mengupdate tampilan di monitor dan memicu animasi (tanpa suara).
+          * Suara dihandle langsung oleh checkForQueueUpdates untuk menghindari duplikasi
           */
          function updateMonitor(queueNumber, counterName, isNewCall = false) {
              const queueNumberEl = document.getElementById('current-queue-number');
@@ -259,7 +343,7 @@
              queueNumberEl.textContent = String(queueNumber).padStart(3, '0');
              counterNameEl.textContent = counterName;
 
-             // Hanya mainkan suara dan animasi jika ini panggilan baru
+             // Hanya mainkan animasi jika ini panggilan baru
              if (isNewCall) {
                  queueContainer.classList.remove('animate-border-pulse');
                  queueNumberEl.classList.remove('animate-number');
@@ -270,10 +354,8 @@
                  queueContainer.classList.add('animate-border-pulse');
                  queueNumberEl.classList.add('animate-number');
 
-                 // Mainkan suara bell dan voice announcement
-                 playBell().then(() => {
-                     speakQueueNumber(queueNumber, counterName);
-                 });
+                 // Catatan: Suara sekarang dihandle langsung oleh checkForQueueUpdates
+                 // untuk menghindari duplikasi pemutaran suara
 
                  setTimeout(() => {
                      queueContainer.classList.remove('animate-border-pulse');
@@ -286,43 +368,96 @@
           * AJAX polling untuk mengecek antrian yang dipanggil
           */
          function checkForQueueUpdates() {
-             fetch('{{ route("queue.currentCalled") }}', {
+             // Gunakan jQuery untuk AJAX request
+             $.ajax({
+                 url: '{{ route("queue.currentCalled") }}',
                  method: 'GET',
+                 dataType: 'json',
                  headers: {
-                     'Content-Type': 'application/json',
                      'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                 }
-             })
-             .then(response => response.json())
-             .then(data => {
-                 if (data.success && data.has_queue) {
-                     const currentQueueId = data.queue.id;
-                     const currentUpdateTime = data.queue.updated_at;
+                 },
+                 success: function(data) {
+                     console.log('AJAX response:', data);
                      
-                     // Cek apakah ini antrian baru atau update
-                     const isNewCall = lastQueueId !== currentQueueId || 
-                                     lastQueueUpdate !== currentUpdateTime;
-                     
-                     if (isNewCall) {
-                         console.log('Antrian baru dipanggil:', data);
-                         updateMonitor(data.queue.queue_number, data.counter.nama_loket, true);
+                     if (data.success && data.has_queue) {
+                         const currentQueueId = data.queue.id;
+                         const currentUpdateTime = data.queue.updated_at;
                          
-                         // Update tracking variables
-                         lastQueueId = currentQueueId;
-                         lastQueueUpdate = currentUpdateTime;
+                         // Cek apakah ini antrian baru atau update
+                         const isNewCall = lastQueueId !== currentQueueId || 
+                                         lastQueueUpdate !== currentUpdateTime;
+                         
+                         if (isNewCall) {
+                             console.log('Antrian baru dipanggil:', data);
+                             
+                             // Mainkan suara bell terlebih dahulu
+                             const bell = document.getElementById('bell-sound');
+                             if (bell) {
+                                 bell.currentTime = 0;
+                                 bell.volume = 1.0;
+                                 
+                                 // Putar suara bell
+                                 const playPromise = bell.play();
+                                 
+                                 if (playPromise !== undefined) {
+                                     playPromise
+                                         .then(() => {
+                                             console.log('Bell sound played successfully');
+                                             
+                                             // Setelah bell selesai, ucapkan nomor antrian
+                                             bell.onended = function() {
+                                                 // Ucapkan nomor antrian
+                                                 const queueNumber = data.queue.queue_number;
+                                                 const counterName = data.counter.nama_loket;
+                                                 
+                                                 // Format nomor antrian
+                                                 const formattedNumber = String(queueNumber).padStart(3, '0');
+                                                 const digits = formattedNumber.split('').join(' '); 
+                                                 const counterNameShort = counterName.split(' ').pop();
+                                                 const text = `Nomor antrian, ${digits}, silahkan menuju ke, loket ${counterNameShort}`;
+                                                 
+                                                 console.log('Speaking:', text);
+                                                 
+                                                 // Gunakan ResponsiveVoice
+                                                 if (window.responsiveVoice) {
+                                                     responsiveVoice.speak(text, "Indonesian Female", { 
+                                                         rate: 0.9, 
+                                                         volume: 1,
+                                                         pitch: 1
+                                                     });
+                                                 } else {
+                                                     console.error('ResponsiveVoice not available');
+                                                 }
+                                             };
+                                         })
+                                         .catch(err => {
+                                             console.error('Failed to play bell sound:', err);
+                                         });
+                                 }
+                             } else {
+                                 console.error('Bell sound element not found');
+                             }
+                             
+                             // Update tampilan
+                             updateMonitor(data.queue.queue_number, data.counter.nama_loket, true);
+                             
+                             // Update tracking variables
+                             lastQueueId = currentQueueId;
+                             lastQueueUpdate = currentUpdateTime;
+                         }
+                     } else {
+                         // Tidak ada antrian yang dipanggil
+                         if (lastQueueId !== null) {
+                             console.log('Tidak ada antrian yang dipanggil');
+                             updateMonitor(0, "Menunggu Panggilan", false);
+                             lastQueueId = null;
+                             lastQueueUpdate = null;
+                         }
                      }
-                 } else {
-                     // Tidak ada antrian yang dipanggil
-                     if (lastQueueId !== null) {
-                         console.log('Tidak ada antrian yang dipanggil');
-                         updateMonitor(0, "Menunggu Panggilan", false);
-                         lastQueueId = null;
-                         lastQueueUpdate = null;
-                     }
+                 },
+                 error: function(xhr, status, error) {
+                     console.error('Error checking queue updates:', error);
                  }
-             })
-             .catch(error => {
-                 console.error('Error checking queue updates:', error);
              });
          }
 
