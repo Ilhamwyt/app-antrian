@@ -262,6 +262,14 @@
                     document.getElementById('queue-position').innerText = data.queue_position;
                     document.getElementById('estimated-time').innerText = data.estimated_wait_time;
                     
+                    // Trigger refresh di halaman loket melalui storage event
+                    localStorage.setItem('queue_updated', JSON.stringify({
+                        queue_id: data.queue_id,
+                        queue_number: data.queue_number,
+                        counter_id: data.counter_id,
+                        timestamp: Date.now()
+                    }));
+                    
                     // Tambahkan tombol untuk melihat status antrian
                     const actionsDiv = document.getElementById('queue-actions');
                     actionsDiv.innerHTML = '';

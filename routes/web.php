@@ -29,8 +29,12 @@ Route::post('/queue/call-next', [QueueController::class, 'callNext'])->name('que
 Route::post('/queue/recall', [QueueController::class, 'recall'])->name('queue.recall');
 // Route untuk menandai antrian sebagai tidak hadir
 Route::post('/queue/mark-absent', [QueueController::class, 'markAbsent'])->name('queue.markAbsent');
-// Route untuk melayani antrian
-Route::post('/queue/serve', [QueueController::class, 'serveQueue'])->name('queue.serve');
+    // Route untuk melayani antrian
+    Route::post('/queue/serve', [QueueController::class, 'serveQueue'])->name('queue.serve');
+    // Route untuk mendapatkan antrian yang sedang dipanggil (untuk monitor)
+    Route::get('/queue/current-called', [QueueController::class, 'getCurrentCalledQueue'])->name('queue.currentCalled');
+    // Route untuk mendapatkan daftar antrian berdasarkan counter (untuk loket)
+    Route::get('/queue/counter/{counterId}', [QueueController::class, 'getQueuesByCounter'])->name('queue.getByCounterAjax');
 });
 
 Route::middleware(['auth'])->group(function () {

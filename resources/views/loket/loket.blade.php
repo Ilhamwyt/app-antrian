@@ -102,12 +102,15 @@
                         <h2 class="text-2xl font-bold text-gray-900 mb-6">Antrian Saat Ini</h2>
                         
                         <!-- Nomor Antrian Aktif -->
-                        <div class="bg-blue-100 rounded-2xl p-8 mb-6 border-4 border-blue-300 shadow-inner text-center animate-border-pulse" id="current-queue">
+                        <div class="bg-blue-100 rounded-2xl p-8 mb-6 border-4 border-blue-300 shadow-inner text-center animate-border-pulse" id="current-queue"
+                             @php
+                                 $currentQueue = $queues->where('status', 'called')->first();
+                             @endphp
+                             @if($currentQueue)
+                                 data-queue-id="{{ $currentQueue->id }}"
+                             @endif>
                             <p class="text-sm font-semibold text-blue-800">Nomor Antrian</p>
                             <div class="text-8xl font-black text-blue-900 mt-2" id="current-queue-number">
-                                @php
-                                    $currentQueue = $queues->where('status', 'called')->first();
-                                @endphp
                                 {{ $currentQueue ? $currentQueue->queue_number : '-' }}
                             </div>
                         </div>
@@ -140,11 +143,14 @@
                         <div class="flex justify-between items-center mb-6">
                             <h2 class="text-2xl font-bold text-gray-900">Daftar Antrian</h2>
                             <div class="flex space-x-2">
+                                <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium">
+                                    Menunggu: <span id="waiting-count">0</span>
+                                </span>
                                 <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium">
-                                    Total: <span id="total-queue">0</span>
+                                    Dipanggil: <span id="called-count">0</span>
                                 </span>
                                 <span class="px-3 py-1 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
-                                    Selesai: <span id="completed-queue">0</span>
+                                    Selesai: <span id="served-count">0</span>
                                 </span>
                             </div>
                         </div>
@@ -290,6 +296,7 @@
             responsiveVoice.speak(text, "Indonesian Female", {rate: 0.9});
         }
         
+
         // Fungsi untuk memanggil antrian berikutnya
         function callQueue() {
             // Kirim request ke server
@@ -306,22 +313,18 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Update tampilan antrian saat ini
+                    // Update tampilan antrian saat ini di halaman LOKET
                     document.getElementById('current-queue-number').textContent = data.queue.queue_number;
                     
-                    // Tambahkan kelas animasi
+                    // Set data-queue-id untuk recall function
                     const currentQueueElement = document.getElementById('current-queue');
+                    currentQueueElement.setAttribute('data-queue-id', data.queue.id);
+                    
+                    // Tambahkan kelas animasi
                     currentQueueElement.classList.add('animate-border-pulse');
                     
-                    // Putar suara bell dan panggil nomor antrian
-                    playBell().then(() => {
-                        speakQueueNumber(data.queue.queue_number);
-                    });
-                    
-                    // Refresh halaman untuk memperbarui daftar antrian
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 5000); // Perpanjang waktu refresh agar suara selesai diputar
+                    // Refresh daftar antrian tanpa reload halaman
+                    refreshQueueList();
                 } else {
                     alert(data.message);
                 }
@@ -333,6 +336,7 @@
         }
         
         // Fungsi untuk memanggil ulang antrian saat ini
+        // Fungsi untuk memanggil ulang antrian saat ini
         function recallQueue() {
             const currentQueueNumber = document.getElementById('current-queue-number').textContent;
             if (currentQueueNumber === '-') {
@@ -340,19 +344,41 @@
                 return;
             }
             
-            // Tambahkan animasi saat memanggil ulang
+            // *** TAMBAHKAN BAGIAN INI ***
+            // Cari ID antrian yang sedang dipanggil (ini butuh sedikit trik atau data dari server)
+            // Cara termudah: simpan ID antrian yang sedang dipanggil di atribut data HTML
             const currentQueueElement = document.getElementById('current-queue');
-            currentQueueElement.classList.add('animate-border-pulse');
-            
-            // Putar suara bell dan panggil nomor antrian
-            playBell().then(() => {
-                speakQueueNumber(currentQueueNumber);
+            const currentQueueId = currentQueueElement.dataset.queueId; // Misalnya, tambahkan data-queue-id di HTML
+
+            if (!currentQueueId) {
+                alert('Tidak dapat mengidentifikasi antrian yang akan diulang.');
+                return;
+            }
+
+            // Kirim request ke server untuk memicu broadcast
+            fetch("{{ route('queue.recall') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({
+                    queue_id: currentQueueId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Suara akan diputar di monitor, jadi tidak perlu di sini
+                    console.log('Pemanggilan ulang telah dikirim ke monitor.');
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan saat mengulang pemanggilan');
             });
-            
-            // Hapus animasi setelah beberapa detik
-            setTimeout(() => {
-                currentQueueElement.classList.remove('animate-border-pulse');
-            }, 5000);
         }
         
         // Fungsi untuk menandai antrian tidak hadir
@@ -368,59 +394,59 @@
                 return;
             }
             
-            // Cari antrian yang sedang dipanggil (status = called)
-            @php
-            $calledQueue = $queues->where('status', 'called')->first();
-            @endphp
+            // Ambil queue ID dari data attribute
+            const currentQueueElement = document.getElementById('current-queue');
+            const queueId = currentQueueElement.getAttribute('data-queue-id');
             
-            @if($calledQueue)
-                // Kirim request ke server
-                fetch("{{ route('queue.markAbsent') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken
-                    },
-                    body: JSON.stringify({
-                        queue_id: "{{ $calledQueue->id }}"
-                    })
+            if (!queueId) {
+                alert('Tidak dapat mengidentifikasi antrian yang akan ditandai tidak hadir');
+                return;
+            }
+            
+            // Kirim request ke server
+            fetch("{{ route('queue.markAbsent') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({
+                    queue_id: queueId
                 })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Reset tampilan antrian saat ini
-                        document.getElementById('current-queue-number').textContent = '-';
-                        
-                        // Refresh halaman untuk memperbarui daftar antrian
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
-                    } else {
-                        alert(data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Terjadi kesalahan saat menandai antrian tidak hadir');
-                });
-            @else
-                alert('Tidak ada antrian yang sedang dipanggil');
-            @endif
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reset tampilan antrian saat ini
+                    document.getElementById('current-queue-number').textContent = '-';
+                    
+                    // Refresh daftar antrian tanpa reload halaman
+                    refreshQueueList();
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan saat menandai antrian tidak hadir');
+            });
         }
         
         // Fungsi untuk melayani antrian
-    function serveQueue() {
-        // Cek apakah ada antrian yang sedang dipanggil
-        @php $calledQueue = $queues->where('status', 'called')->first(); @endphp
-        
-        @if($calledQueue)
+        function serveQueue() {
+            // Cek apakah ada antrian yang sedang dipanggil
+            const currentQueueElement = document.getElementById('current-queue');
+            const queueId = currentQueueElement.getAttribute('data-queue-id');
+            
+            if (!queueId) {
+                alert('Tidak ada antrian yang sedang dipanggil');
+                return;
+            }
+            
             // Tampilkan modal dan isi queue_id
-            document.getElementById('queue_id').value = {{ $calledQueue->id }};
+            document.getElementById('queue_id').value = queueId;
             document.getElementById('serveModal').classList.remove('hidden');
-        @else
-            alert('Tidak ada antrian yang sedang dipanggil');
-        @endif
-    }
+        }
     
     function closeServeModal() {
         document.getElementById('serveModal').classList.add('hidden');
@@ -492,12 +518,10 @@
                 closeServeModal();
                 
                 // Reset tampilan antrian yang dipanggil
-                document.getElementById('current-queue').textContent = '-';
+                document.getElementById('current-queue-number').textContent = '-';
                 
-                // Refresh halaman setelah 1 detik
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
+                // Refresh daftar antrian tanpa reload halaman
+                refreshQueueList();
             } else {
                 alert(data.message);
             }
@@ -507,39 +531,172 @@
             alert('Terjadi kesalahan saat menyimpan data pengunjung');
         });
     }
-    </script>
-    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
-    <script>
-        // Fungsi untuk memperbarui tampilan jam
-        function updateClock() {
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            
-            document.getElementById('current-time').textContent = `${hours}:${minutes}:${seconds}`;
+
+    // Fungsi untuk refresh daftar antrian tanpa reload halaman
+    function refreshQueueList() {
+        fetch(`{{ route('queue.getByCounterAjax', $counter->id) }}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateQueueDisplay(data);
+            }
+        })
+        .catch(error => {
+            console.error('Error refreshing queue list:', error);
+        });
+    }
+
+    // Fungsi untuk memicu refresh manual (dipanggil dari event atau action lain)
+    function triggerRefresh() {
+        console.log('Manual refresh triggered');
+        refreshQueueList();
+    }
+
+    // Variabel untuk tracking perubahan
+    let lastQueueCount = 0;
+    let lastQueueIds = [];
+
+    // Fungsi untuk update tampilan daftar antrian
+    function updateQueueDisplay(data) {
+        // Update counter
+        document.getElementById('waiting-count').textContent = data.waiting_count;
+        document.getElementById('called-count').textContent = data.called_count;
+        document.getElementById('served-count').textContent = data.served_count;
+
+        // Cek apakah ada antrian baru
+        const currentQueueIds = data.queues.map(q => q.id);
+        const hasNewQueue = currentQueueIds.length > lastQueueIds.length || 
+                           !currentQueueIds.every(id => lastQueueIds.includes(id));
+        
+        // Update daftar antrian dalam tabel
+        const queueList = document.getElementById('queue-list');
+        let waitingQueues = '';
+        let servedQueues = '';
+        
+        data.queues.forEach(queue => {
+            if (queue.status === 'waiting') {
+                // Highlight antrian baru dengan animasi
+                const isNewQueue = !lastQueueIds.includes(queue.id);
+                const highlightClass = isNewQueue ? 'animate-pulse bg-blue-50' : '';
+                
+                waitingQueues += `
+                    <tr class="hover:bg-gray-50 border-b ${highlightClass}" id="queue-${queue.id}">
+                        <td class="py-3 px-4">${queue.queue_number}</td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-lg text-xs font-medium">Menunggu</span>
+                        </td>
+                    </tr>
+                `;
+            } else if (queue.status === 'served') {
+                servedQueues += `
+                    <tr class="hover:bg-gray-50 border-b">
+                        <td class="py-3 px-4">${queue.queue_number}</td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded-lg text-xs font-medium">Selesai</span>
+                        </td>
+                    </tr>
+                `;
+            }
+        });
+
+        // Update tabel dengan antrian menunggu
+        if (waitingQueues) {
+            queueList.innerHTML = waitingQueues;
+        } else {
+            queueList.innerHTML = `
+                <tr>
+                    <td colspan="2" class="py-8 text-center text-gray-500">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Belum ada data antrian
+                    </td>
+                </tr>
+            `;
         }
+
+        // Hapus highlight setelah 3 detik untuk antrian baru
+        if (hasNewQueue) {
+            setTimeout(() => {
+                data.queues.forEach(queue => {
+                    const queueElement = document.getElementById(`queue-${queue.id}`);
+                    if (queueElement) {
+                        queueElement.classList.remove('animate-pulse', 'bg-blue-50');
+                    }
+                });
+            }, 3000);
+        }
+
+        // Update antrian saat ini
+        if (data.current_queue) {
+            document.getElementById('current-queue-number').textContent = data.current_queue.queue_number;
+            const currentQueueElement = document.getElementById('current-queue');
+            currentQueueElement.setAttribute('data-queue-id', data.current_queue.id);
+        } else {
+            document.getElementById('current-queue-number').textContent = '-';
+            const currentQueueElement = document.getElementById('current-queue');
+            currentQueueElement.removeAttribute('data-queue-id');
+        }
+
+        // Update tracking variables
+        lastQueueIds = currentQueueIds;
+        lastQueueCount = data.queues.length;
+    }
+
+    // Fungsi untuk memperbarui tampilan jam
+    function updateClock() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
         
-        // Update jam setiap detik
-        updateClock();
-        setInterval(updateClock, 1000);
-        
-        // Inisialisasi Pusher untuk realtime updates
-        const pusher = new Pusher('{{ env("PUSHER_APP_KEY") }}', {
-            cluster: '{{ env("PUSHER_APP_CLUSTER") }}',
-            encrypted: true
-        });
-        
-        // Subscribe ke channel counter
-        const channel = pusher.subscribe('counter.{{ $counter->id }}');
-        
-        // Listen untuk event queue.updated
-        channel.bind('queue.updated', function(data) {
-            console.log('Queue updated:', data);
-            // Refresh halaman untuk menampilkan data terbaru
-            // Atau update elemen DOM secara langsung tanpa refresh
-            location.reload();
-        });
+        document.getElementById('current-time').textContent = `${hours}:${minutes}:${seconds}`;
+    }
+    
+    // Update jam setiap detik
+    updateClock();
+    setInterval(updateClock, 1000);
+    
+    // AJAX polling untuk update real-time
+    setInterval(refreshQueueList, 1000); // Update setiap 1 detik untuk responsivitas lebih baik
+    
+    // Refresh sekali saat halaman dimuat
+    refreshQueueList();
+    
+    // Listen untuk storage events (komunikasi antar tab)
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'queue_updated' && e.newValue) {
+            console.log('Queue updated detected from another tab');
+            triggerRefresh();
+        }
+    });
+    
+    // Listen untuk focus events (ketika user kembali ke tab ini)
+    window.addEventListener('focus', function() {
+        console.log('Window focused, refreshing queue list');
+        triggerRefresh();
+    });
+    
+    // Cek apakah ada parameter highlight dari home page
+    const urlParams = new URLSearchParams(window.location.search);
+    const highlightQueue = urlParams.get('highlight');
+    if (highlightQueue) {
+        // Scroll ke antrian yang di-highlight
+        setTimeout(() => {
+            const queueElement = document.querySelector(`tr:has(td:contains("${highlightQueue}"))`);
+            if (queueElement) {
+                queueElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                queueElement.classList.add('animate-pulse', 'bg-blue-50');
+                setTimeout(() => {
+                    queueElement.classList.remove('animate-pulse', 'bg-blue-50');
+                }, 3000);
+            }
+        }, 2000);
+    }
     </script>
 </body>
 </html>

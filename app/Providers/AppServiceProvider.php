@@ -19,6 +19,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Enable broadcasting
+        \Illuminate\Support\Facades\Broadcast::routes();
     }
 }

@@ -40,6 +40,11 @@ class QueueController extends Controller
             $estimatedWaitTime = ($queuePosition - 1) * 5;
             
             // Broadcast event untuk update realtime
+            \Log::info('Broadcasting queue updated event', [
+                'queue_id' => $queue->id,
+                'queue_number' => $queue->queue_number,
+                'counter_id' => $queue->counter_id
+            ]);
             event(new \App\Events\QueueUpdated($queue));
             
             // Redirect ke halaman hasil dengan data antrian
@@ -199,34 +204,115 @@ class QueueController extends Controller
     // Fungsi untuk memanggil antrian berikutnya
     public function callNext(Request $request)
     {
-        $request->validate([
-            'counter_id' => 'required|exists:counters,id'
-        ]);
-        
-        $counterId = $request->counter_id;
-        
-        // Cari antrian berikutnya dengan status waiting
-        $nextQueue = Queue::where('counter_id', $counterId)
-                        ->where('status', 'waiting')
-                        ->whereDate('created_at', Carbon::today())
-                        ->orderBy('created_at', 'asc')
-                        ->first();
-        
-        if (!$nextQueue) {
+        // ... logika untuk mencari antrian berikutnya ...
+        // Misalnya:
+        $nextQueue = Queue::where('counter_id', $request->counter_id)
+                          ->where('status', 'waiting')
+                          ->orderBy('created_at', 'asc')
+                          ->first();
+
+        if ($nextQueue) {
+            $nextQueue->status = 'called';
+            $nextQueue->save();
+
+            // *** TAMBAHKAN KODE INI UNTUK MENGIRIM EVENT KE MONITOR ***
+            // Ambil nama loket untuk pengumuman
+            $counter = Counter::find($request->counter_id);
+            
+            // Broadcast event ke channel 'monitor-channel'
+            // Pastikan Anda memiliki event class yang sesuai, atau gunakan cara sederhana:
+            \Log::info('Broadcasting queue called event', [
+                'queue_id' => $nextQueue->id,
+                'queue_number' => $nextQueue->queue_number,
+                'counter_id' => $counter->id,
+                'counter_name' => $counter->nama_loket
+            ]);
+            broadcast(new \App\Events\QueueCalledEvent($nextQueue, $counter))->toOthers();
+
             return response()->json([
-                'success' => false,
-                'message' => 'Tidak ada antrian yang menunggu'
+                'success' => true,
+                'queue' => $nextQueue,
+                'message' => 'Antrian berhasil dipanggil.'
             ]);
         }
-        
-        // Update status antrian menjadi called
-        $nextQueue->status = 'called';
-        $nextQueue->called_at = Carbon::now();
-        $nextQueue->save();
-        
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Tidak ada antrian dalam daftar tunggu.'
+        ]);
+    }
+
+    public function recall(Request $request)
+    {
+        $queue = Queue::find($request->queue_id);
+
+        if ($queue && $queue->status === 'called') {
+            // Broadcast event "recall" ke monitor
+            $counter = Counter::find($queue->counter_id);
+            \Log::info('Broadcasting queue recalled event', [
+                'queue_id' => $queue->id,
+                'queue_number' => $queue->queue_number,
+                'counter_id' => $counter->id,
+                'counter_name' => $counter->nama_loket
+            ]);
+            broadcast(new \App\Events\QueueRecalledEvent($queue, $counter))->toOthers();
+
+            return response()->json(['success' => true]);
+        }
+
+        return response()->json(['success' => false, 'message' => 'Antrian tidak ditemukan atau status tidak valid.']);
+    }
+
+    // API endpoint untuk mendapatkan antrian yang sedang dipanggil
+    public function getCurrentCalledQueue()
+    {
+        $calledQueue = Queue::where('status', 'called')
+            ->whereDate('created_at', now()->toDateString())
+            ->with('counter')
+            ->orderBy('updated_at', 'desc')
+            ->first();
+
+        if ($calledQueue) {
+            return response()->json([
+                'success' => true,
+                'has_queue' => true,
+                'queue' => [
+                    'id' => $calledQueue->id,
+                    'queue_number' => $calledQueue->queue_number,
+                    'status' => $calledQueue->status,
+                    'updated_at' => $calledQueue->updated_at->format('Y-m-d H:i:s')
+                ],
+                'counter' => [
+                    'id' => $calledQueue->counter->id,
+                    'nama_loket' => $calledQueue->counter->nama_loket
+                ]
+            ]);
+        }
+
         return response()->json([
             'success' => true,
-            'queue' => $nextQueue
+            'has_queue' => false,
+            'message' => 'Tidak ada antrian yang sedang dipanggil'
+        ]);
+    }
+
+    // API endpoint untuk mendapatkan daftar antrian berdasarkan counter
+    public function getQueuesByCounter($counterId)
+    {
+        $queues = Queue::where('counter_id', $counterId)
+            ->whereDate('created_at', now()->toDateString())
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        $currentQueue = $queues->where('status', 'called')->first();
+
+        return response()->json([
+            'success' => true,
+            'queues' => $queues,
+            'current_queue' => $currentQueue,
+            'waiting_count' => $queues->where('status', 'waiting')->count(),
+            'called_count' => $queues->where('status', 'called')->count(),
+            'served_count' => $queues->where('status', 'served')->count()
         ]);
     }
 }
