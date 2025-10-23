@@ -421,7 +421,7 @@
                                                  // Gunakan ResponsiveVoice
                                                  if (window.responsiveVoice) {
                                                      responsiveVoice.speak(text, "Indonesian Female", { 
-                                                         rate: 0.9, 
+                                                         rate: 0.8, 
                                                          volume: 1,
                                                          pitch: 1
                                                      });
@@ -470,7 +470,7 @@
              updateMonitor(0, "Menunggu Panggilan", false);
              
              // Mulai AJAX polling setiap 2 detik
-             setInterval(checkForQueueUpdates, 2000);
+             setInterval(checkForQueueUpdates, 1000);
              
              // Cek sekali saat halaman dimuat
              checkForQueueUpdates();

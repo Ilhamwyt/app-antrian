@@ -44,7 +44,7 @@
                 <!-- Logo & Title - Branding Universitas Terbuka -->
                 <div class="flex items-center space-x-4">
                     <!-- Logo UT - Menggunakan placeholder image -->
-                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTfrdsbep7iJmgnurZys2VhxUURu1uocZ7YFQ&s" alt="Logo UT" class="w-12 h-12 rounded-full shadow-md object-cover" />
+                    <img src="{{ asset('images/Logout.png') }}" alt="Logo UT" class="w-15 h-12 rounded-full" />
                     <div>
                         <h1 class="text-2xl font-extrabold text-black-900">UNIVERSITAS TERBUKA</h1>
                         <p class="text-sm text-gray-500 font-medium">Sistem Antrian Digital</p>
@@ -67,7 +67,7 @@
             <div class="text-center mb-24">
                 <h2 class="text-5xl md:text-6xl font-extrabold text-gray-900 mb-6 tracking-tight">Layanan Antrian Digital</h2>
                 <p class="text-xl text-gray-600 max-w-3xl mx-auto font-light">
-                    Sistem antrian modern untuk kemudahan dan efisiensi layanan akademik di Universitas Terbuka.
+                    Sistem antrian untuk memudahkan dan efisiensi layanan akademik di Universitas Terbuka.
                 </p>
             </div>
 
@@ -75,7 +75,7 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
                 
                 <!-- Card 1: Panggil Antrian (Untuk Petugas/Operator) -->
-                <div onclick="openModal('modalLoket')" class="bg-white rounded-3xl shadow-xl border border-blue-100 p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-pointer">
+                <div class="bg-white rounded-3xl shadow-xl border border-blue-100 p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-pointer">
                     <!-- Ikon -->
                     <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
                         <i class="fas fa-volume-up text-3xl text-blue-700"></i>
@@ -86,7 +86,7 @@
                 </div>
 
                 <!-- Card 2: Ambil Antrian (Untuk Pengunjung/Mahasiswa) -->
-                <div onclick="openModal('modalQueue')" class="bg-white rounded-3xl shadow-xl border border-blue-100 p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-pointer">
+                <div class="bg-white rounded-3xl shadow-xl border border-blue-100 p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-pointer">
                     <!-- Ikon -->
                     <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
                         <i class="fas fa-ticket-alt text-3xl text-blue-700"></i>
@@ -103,7 +103,7 @@
                         <i class="fas fa-desktop text-3xl text-blue-700"></i>
                     </div>
                     <h3 class="text-2xl font-bold text-gray-900 mb-3">Monitor Antrian</h3>
-                    <p class="text-gray-600 mb-8 font-light">Pantau status, nomor antrian, dan loket yang aktif secara real-time.</p>
+                    <p class="text-gray-600 mb-8 font-light">Pantau status, informasi, dan nomor antrian secara real-time.</p>
                     <a href="{{ url('/monitor') }}" class="inline-flex items-center justify-center px-6 py-3 w-full text-sm font-semibold text-white bg-blue-800 rounded-xl shadow-lg hover:bg-blue-900 transition-all duration-300">Lihat Monitor</a>
                 </div>
             </div>
@@ -197,13 +197,6 @@
                 <span id="display-queue-number" class="text-6xl font-bold text-blue-800 block">000</span>
                 <span id="counter-name" class="text-lg text-blue-600 mt-2 block">Loket</span>
             </div>
-            
-            <div class="text-gray-600 mb-2">
-                <span>Posisi antrian: <span id="queue-position" class="font-semibold">0</span></span>
-            </div>
-            <div class="text-gray-600 mb-6">
-                <span>Estimasi waktu tunggu: <span id="estimated-time" class="font-semibold">0</span> menit</span>
-            </div>
         </div>
         
         <!-- Tombol aksi -->
@@ -259,8 +252,6 @@
                     // Tampilkan nomor antrian
                     document.getElementById('display-queue-number').innerText = data.queue_number;
                     document.getElementById('counter-name').innerText = data.counter_name;
-                    document.getElementById('queue-position').innerText = data.queue_position;
-                    document.getElementById('estimated-time').innerText = data.estimated_wait_time;
                     
                     // Trigger refresh di halaman loket melalui storage event
                     localStorage.setItem('queue_updated', JSON.stringify({
@@ -269,20 +260,6 @@
                         counter_id: data.counter_id,
                         timestamp: Date.now()
                     }));
-                    
-                    // Tambahkan tombol untuk melihat status antrian
-                    const actionsDiv = document.getElementById('queue-actions');
-                    actionsDiv.innerHTML = '';
-                    
-                    const goToLoketButton = document.createElement('button');
-                    goToLoketButton.className = 'mt-4 inline-flex items-center justify-center px-6 py-3 w-full text-sm font-semibold text-white bg-blue-800 rounded-xl shadow-lg hover:bg-blue-900 transition-all duration-300';
-                    goToLoketButton.innerText = 'Lihat Status Antrian';
-                    goToLoketButton.style.textAlign = 'center';
-                    goToLoketButton.onclick = function() {
-                        window.location.href = '/loket/' + data.counter_id + '?highlight=' + data.queue_number;
-                    };
-                    
-                    actionsDiv.appendChild(goToLoketButton);
                 } else {
                     // Tampilkan pesan error
                     document.getElementById('display-queue-number').innerText = 'Error';
@@ -292,7 +269,7 @@
             .catch(error => {
                 console.error('Error:', error);
                 document.getElementById('display-queue-number').innerText = 'Error';
-                alert('Gagal mengambil nomor antrian');
+                showNotification('Gagal Mengambil  Nomor Antrian. Silahkan Coba Lagi', 'error');
             });
         }
     </script>
