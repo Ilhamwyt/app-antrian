@@ -38,7 +38,8 @@ Route::post('/queue/mark-absent', [QueueController::class, 'markAbsent'])->name(
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/dashboard', function () { return view('admin.dashboard');})->name('dashboard');
+    Route::get('/dashboard', [App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/admin/dashboard/data', [App\Http\Controllers\Admin\DashboardController::class, 'getData'])->name('admin.dashboard.data');
     Route::get('/manajemenLoket', [CounterController::class, 'index'])->name('manajemenLoket');
     
     // Route untuk laporan dan CRUD visitors
